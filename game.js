@@ -1,117 +1,125 @@
+// game.js — Twine Space
+
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
-canvas.width = window.innerWidth * 0.8;
-canvas.height = window.innerHeight * 0.8;
 
-let lives = 3;
-let shipX = canvas.width/2;
-let shipY = canvas.height - 100;
-let shipWidth = 50;
-let shipHeight = 50;
-let speed = 5;
-let keys = {};
-let meteors = [];
-let shipImg = new Image();
+canvas.width = canvas.offsetWidth;
+canvas.height = canvas.offsetHeight;
+
+let ship = {
+  x: canvas.width / 2,
+  y: canvas.height - 100,
+  width: 64,
+  height: 64,
+  img: new Image(),
+  speed: 6,
+  lives: 3
+};
 
 const skins = ['twine_1.png','twine_2.png','twine_3.png','twine_4.png','twine_5.png'];
 const skinSelect = document.getElementById('skinSelect');
 const skinPreview = document.getElementById('skinPreview');
+const playBtn = document.getElementById('playBtn');
+const livesDisplay = document.getElementById('lives');
 
-// Populate skin selector
-skins.forEach(skin => {
-  let opt = document.createElement('option');
-  opt.value = skin;
-  opt.text = skin;
+let meteors = [];
+let keys = {};
+let gameStarted = false;
+
+// Инициализация селекта с скинами
+skins.forEach((s,i)=>{
+  const opt = document.createElement('option');
+  opt.value = s;
+  opt.textContent = `Skin ${i+1}`;
   skinSelect.appendChild(opt);
 });
+ship.img.src = skins[0];
+skinPreview.style.backgroundImage = `url('images/${skins[0]}')`;
+skinPreview.style.backgroundSize = 'contain';
+skinPreview.style.backgroundRepeat = 'no-repeat';
+skinPreview.style.backgroundPosition = 'center';
 
-// Update preview when selecting skin
+// Обновление превью при выборе скина
 skinSelect.addEventListener('change', ()=>{
-  shipImg.src = 'images/'+skinSelect.value;
-  skinPreview.innerHTML = '';
-  let previewImg = new Image();
-  previewImg.src = 'images/'+skinSelect.value;
-  previewImg.style.maxHeight='70px';
-  skinPreview.appendChild(previewImg);
+  const sel = skinSelect.value;
+  skinPreview.style.backgroundImage = `url('images/${sel}')`;
+  ship.img.src = 'images/' + sel;
 });
 
-// Default skin
-shipImg.src = 'images/'+skins[0];
-let previewImg = new Image();
-previewImg.src = 'images/'+skins[0];
-previewImg.style.maxHeight='70px';
-skinPreview.appendChild(previewImg);
+// Кнопки управления для ПК
+document.addEventListener('keydown', e=> keys[e.key] = true);
+document.addEventListener('keyup', e=> keys[e.key] = false);
 
-// Start Screen
-const startScreen = document.getElementById('startScreen');
-const playBtn = document.getElementById('playBtn');
-playBtn.addEventListener('click', ()=>{
-  shipImg.src = 'images/'+skinSelect.value;
-  startScreen.style.display='none';
-  animate();
-});
-
-// Keyboard
-window.addEventListener('keydown',(e)=>{keys[e.key]=true});
-window.addEventListener('keyup',(e)=>{keys[e.key]=false});
-
-// Touch buttons
+// Мобильные кнопки
 ['btnLeft','btnRight','btnUp','btnDown'].forEach(id=>{
   const btn = document.getElementById(id);
-  btn.addEventListener('touchstart', ()=>{keys[id]=true});
-  btn.addEventListener('touchend', ()=>{keys[id]=false});
+  btn.addEventListener('touchstart', ()=> keys[id]=true);
+  btn.addEventListener('touchend', ()=> keys[id]=false);
 });
 
+// Создание метеоритов
 function spawnMeteor(){
-  let size = Math.random()*40 + 20;
-  meteors.push({x:Math.random()*canvas.width, y:-size, w:size, h:size, speed:Math.random()*3+2});
-}
-
-function update(){
-  // Ship movement
-  if(keys['ArrowLeft'] || keys['btnLeft']) shipX-=speed;
-  if(keys['ArrowRight'] || keys['btnRight']) shipX+=speed;
-  if(keys['ArrowUp'] || keys['btnUp']) shipY-=speed;
-  if(keys['ArrowDown'] || keys['btnDown']) shipY+=speed;
-
-  shipX = Math.max(0, Math.min(canvas.width-shipWidth, shipX));
-  shipY = Math.max(0, Math.min(canvas.height-shipHeight, shipY));
-
-  if(Math.random()<0.02) spawnMeteor();
-
-  meteors.forEach(m=>{ m.y += m.speed; });
-
-  // Remove off-screen meteors
-  meteors = meteors.filter(m=> m.y < canvas.height + 50);
-
-  // Collision
-  meteors.forEach((m,i)=>{
-    if(shipX < m.x + m.w && shipX + shipWidth > m.x && shipY < m.y + m.h && shipY + shipHeight > m.y){
-      lives--;
-      document.getElementById('lives').textContent = lives;
-      meteors.splice(i,1);
-      if(lives<=0){ alert('Game Over!'); window.location.reload(); }
-    }
+  const size = Math.random()*40 + 30;
+  meteors.push({
+    x: Math.random()*(canvas.width-size),
+    y: -size,
+    width: size,
+    height: size,
+    speed: Math.random()*3 + 2
   });
 }
 
-function draw(){
+// Проверка столкновения
+function checkCollision(a,b){
+  return !(a.x+a.width < b.x || a.x > b.x+b.width || a.y+a.height < b.y || a.y > b.y+b.height);
+}
+
+// Игровой цикл
+function update(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  // Draw ship
-  ctx.drawImage(shipImg,shipX,shipY,shipWidth,shipHeight);
+  // Движение корабля
+  if(keys['ArrowLeft'] || keys['btnLeft']) ship.x -= ship.speed;
+  if(keys['ArrowRight'] || keys['btnRight']) ship.x += ship.speed;
+  if(keys['ArrowUp'] || keys['btnUp']) ship.y -= ship.speed;
+  if(keys['ArrowDown'] || keys['btnDown']) ship.y += ship.speed;
 
-  // Draw meteors
-  meteors.forEach(m=>{
-    ctx.fillStyle='rgba(255,100,100,0.8)';
+  // Ограничения по экрану
+  ship.x = Math.max(0, Math.min(canvas.width-ship.width, ship.x));
+  ship.y = Math.max(0, Math.min(canvas.height-ship.height, ship.y));
+
+  // Рисуем корабль
+  ctx.drawImage(ship.img, ship.x, ship.y, ship.width, ship.height);
+
+  // Метеориты
+  if(gameStarted && Math.random() < 0.02) spawnMeteor();
+  meteors.forEach((m, i)=>{
+    m.y += m.speed;
+    ctx.fillStyle = 'red';
     ctx.beginPath();
-    ctx.arc(m.x + m.w/2, m.y + m.h/2, m.w/2, 0, Math.PI*2);
+    ctx.arc(m.x+m.width/2, m.y+m.height/2, m.width/2, 0, Math.PI*2);
     ctx.fill();
+
+    // Проверка столкновения
+    if(checkCollision(ship, m)){
+      meteors.splice(i,1);
+      ship.lives--;
+      livesDisplay.textContent = ship.lives;
+    }
+
+    // Удаление за экраном
+    if(m.y > canvas.height) meteors.splice(i,1);
   });
+
+  requestAnimationFrame(update);
 }
 
-function animate(){
+// Старт игры
+playBtn.addEventListener('click', ()=>{
+  document.getElementById('startScreen').style.display = 'none';
+  gameStarted = true;
   update();
-  draw();
-  requestAnimationFrame(animate);
-}
+});
+
+// Отображение жизней сразу
+livesDisplay.textContent = ship.lives;
