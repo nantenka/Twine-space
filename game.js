@@ -17,6 +17,7 @@ const skins = ['twine_1.png','twine_2.png','twine_3.png','twine_4.png','twine_5.
 const skinSelect = document.getElementById('skinSelect');
 const skinPreview = document.getElementById('skinPreview');
 
+// Populate skin selector
 skins.forEach(skin => {
   let opt = document.createElement('option');
   opt.value = skin;
@@ -24,15 +25,17 @@ skins.forEach(skin => {
   skinSelect.appendChild(opt);
 });
 
+// Update preview when selecting skin
 skinSelect.addEventListener('change', ()=>{
   shipImg.src = 'images/'+skinSelect.value;
   skinPreview.innerHTML = '';
   let previewImg = new Image();
   previewImg.src = 'images/'+skinSelect.value;
-  previewImg.style.maxHeight = '70px';
+  previewImg.style.maxHeight='70px';
   skinPreview.appendChild(previewImg);
 });
 
+// Default skin
 shipImg.src = 'images/'+skins[0];
 let previewImg = new Image();
 previewImg.src = 'images/'+skins[0];
@@ -43,11 +46,12 @@ skinPreview.appendChild(previewImg);
 const startScreen = document.getElementById('startScreen');
 const playBtn = document.getElementById('playBtn');
 playBtn.addEventListener('click', ()=>{
+  shipImg.src = 'images/'+skinSelect.value;
   startScreen.style.display='none';
   animate();
 });
 
-// Keyboard controls
+// Keyboard
 window.addEventListener('keydown',(e)=>{keys[e.key]=true});
 window.addEventListener('keyup',(e)=>{keys[e.key]=false});
 
@@ -64,6 +68,7 @@ function spawnMeteor(){
 }
 
 function update(){
+  // Ship movement
   if(keys['ArrowLeft'] || keys['btnLeft']) shipX-=speed;
   if(keys['ArrowRight'] || keys['btnRight']) shipX+=speed;
   if(keys['ArrowUp'] || keys['btnUp']) shipY-=speed;
@@ -74,11 +79,9 @@ function update(){
 
   if(Math.random()<0.02) spawnMeteor();
 
-  meteors.forEach(m=>{
-    m.y += m.speed;
-  });
+  meteors.forEach(m=>{ m.y += m.speed; });
 
-  // Remove meteors that are off-screen
+  // Remove off-screen meteors
   meteors = meteors.filter(m=> m.y < canvas.height + 50);
 
   // Collision
@@ -87,7 +90,7 @@ function update(){
       lives--;
       document.getElementById('lives').textContent = lives;
       meteors.splice(i,1);
-      if(lives<=0){alert('Game Over!'); window.location.reload();}
+      if(lives<=0){ alert('Game Over!'); window.location.reload(); }
     }
   });
 }
