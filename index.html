@@ -8,11 +8,13 @@
 </head>
 <body>
 
-  <!-- LOADING / START SCREEN -->
+  <!-- START SCREEN -->
   <div id="startScreen" class="start-screen">
     <div class="start-inner">
       <h1 class="game-title">Twine Space</h1>
-      <div class="loading-text">Loading...</div>
+      <div class="loading-text">Choose skin and press PLAY</div>
+      <select id="skinSelect"></select>
+      <div class="skin-preview" id="skinPreview">Preview</div>
       <button id="playBtn" class="play-btn">PLAY</button>
     </div>
   </div>
@@ -34,18 +36,6 @@
           <button class="t-btn" id="btnRight">▶</button>
         </div>
       </section>
-
-      <aside class="panel">
-        <div style="margin-bottom:10px;font-weight:800">Скины</div>
-        <select id="skinSelect"></select>
-        <div class="skin-preview center" id="skinPreview">Preview</div>
-
-        <div class="controls">
-          <button id="startBtn">Start</button>
-          <button id="pauseBtn">Pause</button>
-          <button id="shuffleBtn">Shuffle</button>
-        </div>
-      </aside>
     </main>
   </div>
 
