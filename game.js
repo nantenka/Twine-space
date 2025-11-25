@@ -1,4 +1,3 @@
-// game.js — Twine Space
 document.addEventListener('DOMContentLoaded', () => {
   const playBtn = document.getElementById('playBtn');
   const startScreen = document.getElementById('startScreen');
@@ -23,36 +22,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
   skinPreview.innerHTML = `<img src='images/${currentSkin}' alt='Skin' style='height:80px;'>`;
 
-  // старт игры
   playBtn.addEventListener('click', () => {
     startScreen.style.display = 'none';
-    startGame();
+    startGame(currentSkin);
   });
 
-  function startGame() {
+  function startGame(selectedSkin) {
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
     canvas.width = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
 
     const player = new Image();
-    player.src = `images/${currentSkin}`;
+    player.src = `images/${selectedSkin}`;
     let playerX = canvas.width/2;
     let playerY = canvas.height - 120;
 
-    const keys = {};
+    let lives = 3;
+    document.getElementById('lives').textContent = lives;
 
-    // управление клавиатурой
+    const keys = {};
+    const meteors = [];
+
     document.addEventListener('keydown', e => keys[e.key] = true);
     document.addEventListener('keyup', e => keys[e.key] = false);
 
-    // управление кнопками
+    // мобильные кнопки
     document.getElementById('btnLeft').addEventListener('click', ()=>playerX-=10);
     document.getElementById('btnRight').addEventListener('click', ()=>playerX+=10);
     document.getElementById('btnUp').addEventListener('click', ()=>playerY-=10);
     document.getElementById('btnDown').addEventListener('click', ()=>playerY+=10);
 
-    const meteors = [];
     function spawnMeteor() {
       meteors.push({
         x: Math.random()*canvas.width,
@@ -60,6 +60,13 @@ document.addEventListener('DOMContentLoaded', () => {
         size: 20 + Math.random()*30,
         speed: 2 + Math.random()*3
       });
+    }
+
+    function checkCollision(px, py, size, meteor) {
+      const dx = px - meteor.x;
+      const dy = py - meteor.y;
+      const distance = Math.sqrt(dx*dx + dy*dy);
+      return distance < size + meteor.size;
     }
 
     function gameLoop() {
@@ -81,17 +88,26 @@ document.addEventListener('DOMContentLoaded', () => {
       // спавн метеоритов
       if(Math.random()<0.03) spawnMeteor();
 
-      // рисуем метеориты
+      // рисуем метеориты и проверяем столкновения
       ctx.fillStyle = '#ff5e5e';
-      for(let i=0;i<meteors.length;i++){
+      for(let i=meteors.length-1;i>=0;i--){
         const m = meteors[i];
         ctx.beginPath();
         ctx.arc(m.x, m.y, m.size, 0, Math.PI*2);
         ctx.fill();
         m.y += m.speed;
 
-        // удаление за экраном
-        if(m.y>canvas.height+50) meteors.splice(i,1);
+        if(checkCollision(playerX, playerY, 32, m)){
+          meteors.splice(i,1);
+          lives--;
+          document.getElementById('lives').textContent = lives;
+          if(lives <= 0){
+            alert('Game Over!');
+            window.location.reload();
+          }
+        } else if(m.y>canvas.height+50) {
+          meteors.splice(i,1);
+        }
       }
 
       requestAnimationFrame(gameLoop);
