@@ -1,341 +1,140 @@
-// game.js — (RE)SPACE
-// Works with index.html + style.css + images/re_1.png ... re_5.png
-
-const CONFIG = {
-  internalW: 540,
-  internalH: 960,
-  playerSize: 88,
-  meteorMin: 28,
-  meteorMax: 110,
-  spawnIntervalBase: 700,
-  initialLives: 3,
-  skins: [
-    'images/twine_1.png',
-    'images/twine_2.png',
-    'images/twine_3.png',
-    'images/twine_4.png',
-    'images/twine_5.png'
-  ]
-};
-
-// Canvas
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
-let DPR = Math.max(1, window.devicePixelRatio || 1);
-function resizeCanvas(){
-  const parent = canvas.parentElement;
-  const pw = parent.clientWidth, ph = parent.clientHeight;
-  const aspect = CONFIG.internalW / CONFIG.internalH;
-  let drawW = pw, drawH = Math.round(drawW / aspect);
-  if(drawH > ph){ drawH = ph; drawW = Math.round(drawH * aspect); }
-  canvas.style.width = drawW + 'px'; canvas.style.height = drawH + 'px';
-  DPR = Math.max(1, window.devicePixelRatio || 1);
-  canvas.width = Math.round(CONFIG.internalW * DPR);
-  canvas.height = Math.round(CONFIG.internalH * DPR);
-  ctx.setTransform(DPR,0,0,DPR,0,0);
-}
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
+canvas.width = window.innerWidth * 0.7;
+canvas.height = window.innerHeight * 0.7;
 
-// State & UI refs
-const state = {
-  running: false,
-  preStart: true,
-  time: 0,
-  lastSpawn: 0,
-  meteors: [],
-  particles: [],
-  player: null,
-  score: 0,
-  best: Number(localStorage.getItem('sd_best') || 0),
-  lives: CONFIG.initialLives,
-  spawnInterval: CONFIG.spawnIntervalBase
+let gameStarted = false;
+
+// Корабль
+const ship = {
+  x: canvas.width/2,
+  y: canvas.height - 100,
+  width: 60,
+  height: 60,
+  speed: 6,
+  lives: 3,
+  skin: null,
+  img: new Image()
 };
 
-const scoreEl = document.getElementById('score');
-const bestEl = document.getElementById('best');
-const livesEl = document.getElementById('lives');
-const speedEl = document.getElementById('speed');
-const playBtn = document.getElementById('playBtn');
-const startScreen = document.getElementById('startScreen');
-const loadingProgress = document.getElementById('loadingProgress');
-const loadingText = document.getElementById('loadingText');
+// Метеориты
+let meteors = [];
+let meteorSpawnRate = 60;
+let frameCount = 0;
+
+// Скины
+const skins = ['twine_1.png','twine_2.png','twine_3.png','twine_4.png','twine_5.png'];
 const skinSelect = document.getElementById('skinSelect');
 const skinPreview = document.getElementById('skinPreview');
 
-// Input
-const input = { left:false, right:false, up:false, down:false };
-window.addEventListener('keydown', e=>{
-  if(e.key==='ArrowLeft'|| e.key==='a') input.left=true;
-  if(e.key==='ArrowRight'|| e.key==='d') input.right=true;
-  if(e.key==='ArrowUp'|| e.key==='w') input.up=true;
-  if(e.key==='ArrowDown'|| e.key==='s') input.down=true;
-  if(e.key===' '){ toggleRunning(); }
-});
-window.addEventListener('keyup', e=>{
-  if(e.key==='ArrowLeft'|| e.key==='a') input.left=false;
-  if(e.key==='ArrowRight'|| e.key==='d') input.right=false;
-  if(e.key==='ArrowUp'|| e.key==='w') input.up=false;
-  if(e.key==='ArrowDown'|| e.key==='s') input.down=false;
+skins.forEach(s=>{
+  const option = document.createElement('option');
+  option.value = s;
+  option.textContent = s.split('.')[0];
+  skinSelect.appendChild(option);
 });
 
-// Touch controls
-['btnLeft','btnRight','btnUp','btnDown'].forEach(id=>{
-  const el = document.getElementById(id);
-  if(!el) return;
-  el.addEventListener('touchstart', e=>{ e.preventDefault(); if(id==='btnLeft') input.left=true; if(id==='btnRight') input.right=true; if(id==='btnUp') input.up=true; if(id==='btnDown') input.down=true; }, {passive:false});
-  el.addEventListener('touchend', e=>{ e.preventDefault(); if(id==='btnLeft') input.left=false; if(id==='btnRight') input.right=false; if(id==='btnUp') input.up=false; if(id==='btnDown') input.down=false; }, {passive:false});
+// Выбор скина
+skinSelect.addEventListener('change', e=>{
+  ship.skin = e.target.value;
+  ship.img.src = `images/${ship.skin}`;
+  skinPreview.innerHTML = '';
+  const img = new Image();
+  img.src = ship.img.src;
+  img.style.width = '80px';
+  img.style.height = '80px';
+  skinPreview.appendChild(img);
 });
 
-// Drag-to-move
-let dragging=false;
-canvas.addEventListener('mousedown', ()=>dragging=true);
-window.addEventListener('mouseup', ()=>dragging=false);
-canvas.addEventListener('mousemove', e=>{
-  if(!dragging) return;
-  const r = canvas.getBoundingClientRect();
-  const sx = (e.clientX - r.left)/r.width;
-  const sy = (e.clientY - r.top)/r.height;
-  if(state.player){ state.player.x = sx * CONFIG.internalW; state.player.y = sy * CONFIG.internalH; }
+// Управление
+const keys = {};
+document.addEventListener('keydown', e=>keys[e.key.toLowerCase()]=true);
+document.addEventListener('keyup', e=>keys[e.key.toLowerCase()]=false);
+
+// Мобильные кнопки
+['Left','Right','Up','Down'].forEach(dir=>{
+  const btn = document.getElementById('btn'+dir);
+  btn.addEventListener('touchstart',()=>keys['arrow'+dir.toLowerCase()]=true);
+  btn.addEventListener('touchend',()=>keys['arrow'+dir.toLowerCase()]=false);
 });
 
-// util
-const rand = (a,b)=>Math.random()*(b-a)+a;
-const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+// Кнопка Play
+const playBtn = document.getElementById('playBtn');
+playBtn.addEventListener('click', ()=>{
+  if(!ship.skin){
+    ship.skin = skins[0];
+    ship.img.src = `images/${ship.skin}`;
+  }
+  gameStarted = true;
+  document.getElementById('startScreen').style.display = 'none';
+  requestAnimationFrame(update);
+});
 
-// preload skins
-const skinImages = [];
-let assetsLoaded = 0;
-function preloadSkins(){
-  return new Promise((res)=>{
-    CONFIG.skins.forEach((src,i)=>{
-      const img = new Image();
-      img.onload = ()=>{
-        skinImages[i] = img;
-        assetsLoaded++; updateLoading();
-        if(assetsLoaded === CONFIG.skins.length) res();
-      };
-      img.onerror = ()=>{
-        // fallback small blank image
-        const c = document.createElement('canvas'); c.width=128; c.height=128;
-        const g = c.getContext('2d'); g.fillStyle='#7cffc5'; g.fillRect(0,0,128,128);
-        const im = new Image(); im.src = c.toDataURL();
-        skinImages[i] = im;
-        assetsLoaded++; updateLoading();
-        if(assetsLoaded === CONFIG.skins.length) res();
-      };
-      img.src = src;
+// Проверка столкновения
+function checkCollision(a,b){
+  return a.x < b.x + b.width &&
+         a.x + a.width > b.x &&
+         a.y < b.y + b.height &&
+         a.y + a.height > b.y;
+}
+
+// Основной цикл
+function update(){
+  if(!gameStarted) return;
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Движение корабля
+  if(keys['arrowleft'] && ship.x>0) ship.x -= ship.speed;
+  if(keys['arrowright'] && ship.x+ship.width<canvas.width) ship.x += ship.speed;
+  if(keys['arrowup'] && ship.y>0) ship.y -= ship.speed;
+  if(keys['arrowdown'] && ship.y+ship.height<canvas.height) ship.y += ship.speed;
+
+  // Рисуем корабль
+  ctx.drawImage(ship.img, ship.x, ship.y, ship.width, ship.height);
+
+  // Спавн метеоритов
+  frameCount++;
+  if(frameCount % meteorSpawnRate === 0){
+    meteors.push({
+      x: Math.random()*(canvas.width-40),
+      y: -40,
+      width: 40,
+      height: 40,
+      speed: 3 + Math.random()*2,
+      hit: false
     });
-  });
-}
-function updateLoading(){
-  const pct = Math.round((assetsLoaded / CONFIG.skins.length) * 100);
-  loadingProgress.style.width = pct + '%';
-  loadingText.textContent = 'Загрузка скинов... ' + pct + '%';
-}
-
-// UI: skin select
-function populateSkins(){
-  skinSelect.innerHTML = '';
-  CONFIG.skins.forEach((s,i)=>{
-    const opt = document.createElement('option');
-    opt.value = i; opt.textContent = `Skin ${i+1}`;
-    skinSelect.appendChild(opt);
-  });
-  skinSelect.addEventListener('change', ()=>{ const idx = Number(skinSelect.value); setPlayerSkin(idx); });
-  setPlayerSkin(0);
-}
-function setPlayerSkin(idx){
-  if(!skinImages[idx]) return;
-  if(state.player) state.player.skin = skinImages[idx];
-  const img = document.createElement('img'); img.src = skinImages[idx].src; img.style.maxHeight='88px';
-  skinPreview.innerHTML = ''; skinPreview.appendChild(img);
-  skinSelect.value = idx;
-}
-
-// create player
-function createPlayer(){
-  state.player = {
-    x: CONFIG.internalW/2,
-    y: CONFIG.internalH * 0.75,
-    w: CONFIG.playerSize,
-    h: CONFIG.playerSize,
-    skin: skinImages[0] || null,
-    invuln: 0
-  };
-  setPlayerSkin(0);
-}
-
-// meteors
-function spawnMeteor(pre=false){
-  const size = rand(CONFIG.meteorMin, CONFIG.meteorMax);
-  const x = rand(size/2, CONFIG.internalW - size/2);
-  const y = pre ? rand(-CONFIG.internalH, -40) : -size;
-  state.meteors.push({ x, y, size, speed: rand(1.2, 5.2), ang: rand(0, Math.PI*2), rot: rand(-0.02, 0.02) });
-}
-
-// particles
-function emitParticles(x,y, color='#ffb86b', count=12){
-  for(let i=0;i<count;i++) state.particles.push({ x, y, vx: rand(-3,3), vy: rand(-5,1), life: rand(400,1000), age:0, col:color });
-}
-
-// collisions
-function circRectColl(px,py,pr, cx,cy,cr){
-  const dx = Math.abs(cx-px); const dy = Math.abs(cy-py);
-  if(dx > pr + cr) return false; if(dy > pr + cr) return false;
-  return Math.hypot(dx,dy) < (pr + cr) * 0.95;
-}
-
-// beeps
-const audioCtx = (window.AudioContext||window.webkitAudioContext) ? new (window.AudioContext||window.webkitAudioContext)() : null;
-function beep(freq=260, dur=0.06){
-  if(!audioCtx) return;
-  const t = audioCtx.currentTime;
-  const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
-  o.connect(g); g.connect(audioCtx.destination); o.type='sine'; o.frequency.setValueAtTime(freq,t);
-  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.04,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-  o.start(t); o.stop(t+dur+0.02);
-}
-
-// game flow
-function resetGame(){
-  state.meteors = []; state.particles = []; state.score = 0; state.lives = CONFIG.initialLives;
-  state.spawnInterval = CONFIG.spawnIntervalBase; state.running = true; state.preStart = false; state.lastSpawn = 0;
-  scoreEl.textContent = state.score; livesEl.textContent = state.lives; bestEl.textContent = state.best;
-}
-function endGame(){
-  state.running = false; state.preStart = true; emitParticles(CONFIG.internalW/2, CONFIG.internalH/2, '#ffd166', 40);
-  if(state.score > state.best){ state.best = state.score; localStorage.setItem('sd_best', state.best); bestEl.textContent = state.best; }
-  setTimeout(()=> startScreen.style.display = 'flex', 300);
-}
-
-// loop
-let lastTime = performance.now();
-function loop(now){
-  const dt = now - lastTime; lastTime = now; state.time += dt;
-  update(dt); render();
-  requestAnimationFrame(loop);
-}
-
-function update(dt){
-  state.lastSpawn += dt;
-  const interval = Math.max(160, state.spawnInterval - Math.floor(state.score * 2));
-  if(state.lastSpawn > interval){ spawnMeteor(state.preStart); state.lastSpawn = 0; }
-
-  // player move
-  const p = state.player;
-  if(p){
-    const speed = 8;
-    if(input.left) p.x -= speed*(dt/16);
-    if(input.right) p.x += speed*(dt/16);
-    if(input.up) p.y -= speed*(dt/16);
-    if(input.down) p.y += speed*(dt/16);
-    p.x = clamp(p.x, p.w/2 + 8, CONFIG.internalW - p.w/2 - 8);
-    p.y = clamp(p.y, p.h/2 + 24, CONFIG.internalH - p.h/2 - 8);
-    if(p.invuln>0) p.invuln = Math.max(0, p.invuln - dt);
   }
 
-  // meteors
-  for(let i=state.meteors.length-1;i>=0;i--){
-    const m = state.meteors[i];
-    m.y += m.speed * (dt/16) * (1 + state.score * 0.002);
-    m.ang += m.rot * (dt/16);
-    if(m.y - m.size > CONFIG.internalH + 200){ state.meteors.splice(i,1); if(!state.preStart){ state.score += 1; scoreEl.textContent = state.score; } continue; }
-    if(!state.preStart && p && p.invuln <= 0){
-      if(circRectColl(p.x, p.y, Math.max(p.w,p.h)/2, m.x, m.y, m.size/2)){
-        state.lives -= 1; livesEl.textContent = state.lives; p.invuln = 1200; emitParticles(p.x, p.y, '#ff6b6b', 20);
-        if(audioCtx) beep(180, 0.04);
-        if(state.lives <= 0){ endGame(); return; }
-      }
+  // Рисуем метеориты
+  meteors.forEach((m,i)=>{
+    m.y += m.speed;
+    ctx.fillStyle = 'red';
+    ctx.beginPath();
+    ctx.arc(m.x+m.width/2,m.y+m.height/2,m.width/2,0,Math.PI*2);
+    ctx.fill();
+
+    if(!m.hit && checkCollision(ship,m)){
+      m.hit = true;
+      ship.lives--;
+      if(ship.lives<0) ship.lives=0;
+      document.getElementById('lives').textContent = ship.lives;
     }
-  }
 
-  // particles
-  for(let i=state.particles.length-1;i>=0;i--){
-    const pr = state.particles[i]; pr.age += dt;
-    if(pr.age > pr.life){ state.particles.splice(i,1); continue; }
-    pr.x += pr.vx * (dt/16); pr.y += pr.vy * (dt/16); pr.vy += 0.06 * (dt/16);
-  }
-
-  state.spawnInterval = Math.max(160, CONFIG.spawnIntervalBase - Math.floor(state.score * 2));
-}
-
-function render(){
-  ctx.clearRect(0,0,CONFIG.internalW, CONFIG.internalH);
-  renderStars();
-
-  // meteors
-  for(const m of state.meteors){
-    ctx.save(); ctx.translate(m.x, m.y); ctx.rotate(m.ang);
-    const g = ctx.createRadialGradient(0,0,m.size*0.1, 0,0,m.size*0.9);
-    g.addColorStop(0, 'rgba(255,200,120,0.12)'); g.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0,0,m.size*0.9,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#7b6f62'; ctx.beginPath();
-    ctx.moveTo(-m.size*0.5, -m.size*0.2); ctx.lineTo(-m.size*0.2, -m.size*0.6);
-    ctx.lineTo(m.size*0.6, -m.size*0.1); ctx.lineTo(m.size*0.3, m.size*0.5);
-    ctx.lineTo(-m.size*0.4, m.size*0.6); ctx.closePath(); ctx.fill();
-    ctx.restore();
-  }
-
-  // particles
-  for(const pr of state.particles){
-    ctx.globalAlpha = clamp(1 - pr.age/pr.life,0,1);
-    ctx.fillStyle = pr.col; ctx.beginPath(); ctx.arc(pr.x, pr.y, 3, 0, Math.PI*2); ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-
-  // player
-  const p = state.player;
-  if(p){
-    ctx.save(); ctx.translate(p.x, p.y);
-    if(p.invuln>0) ctx.globalAlpha = 0.5 + 0.5 * Math.sin(performance.now() / 80);
-    ctx.beginPath(); ctx.ellipse(0, p.h*0.42, p.w*0.5, p.h*0.18, 0, 0, Math.PI*2); ctx.fillStyle = 'rgba(0,0,0,0.36)'; ctx.fill();
-    if(p.skin){ const iw=p.skin.width, ih=p.skin.height, scale = Math.min(p.w/iw, p.h/ih); ctx.drawImage(p.skin, -iw*scale/2, -ih*scale/2, iw*scale, ih*scale); }
-    else { ctx.fillStyle = '#7cffc5'; ctx.beginPath(); ctx.arc(0,0,p.w/2,0,Math.PI*2); ctx.fill(); }
-    ctx.restore();
-  }
-}
-
-function renderStars(){
-  const count = 80;
-  ctx.save();
-  for(let i=0;i<count;i++){
-    const x = (i*47*1.2 + (state.time*0.02*(i%3))) % CONFIG.internalW;
-    const y = ((i*97) % CONFIG.internalH) * 1.02;
-    const r = (i%7===0)?1.6:(i%5===0?1.0:0.6);
-    ctx.fillStyle = 'rgba(160,220,255,0.06)'; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
-  }
-  ctx.restore();
-}
-
-// bootstrap
-(async function init(){
-  // show start screen
-  startScreen.style.display = 'flex';
-  // preload skins
-  await preloadSkins();
-  populateSkins();
-  // create player
-  createPlayer();
-  // create background meteors for preStart animation
-  for(let i=0;i<10;i++) spawnMeteor(true);
-
-  // handlers
-  playBtn.addEventListener('click', ()=>{
-    if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-    startScreen.style.display = 'none';
-    resetGame();
+    if(m.y>canvas.height || m.hit) meteors.splice(i,1);
   });
 
-  document.getElementById('startBtn').addEventListener('click', ()=>{ startScreen.style.display='none'; resetGame(); });
-  document.getElementById('pauseBtn').addEventListener('click', ()=>{ state.running = !state.running; if(state.running) lastTime = performance.now(); });
-  document.getElementById('shuffleBtn').addEventListener('click', ()=>{ state.meteors.forEach(m=> m.x = rand(0, CONFIG.internalW)); });
+  // Проверка конца игры
+  if(ship.lives <=0){
+    gameStarted = false;
+    document.getElementById('startScreen').style.display='flex';
+    document.getElementById('startScreen').querySelector('.game-title').textContent='Game Over';
+    meteors = [];
+    ship.x = canvas.width/2;
+    ship.y = canvas.height-100;
+    ship.lives = 3;
+    document.getElementById('lives').textContent = ship.lives;
+  }
 
-  // mobile touch mapping (also handled above)
-  const map = {'btnLeft':'btnLeft','btnRight':'btnRight','btnUp':'btnUp','btnDown':'btnDown'};
-  Object.keys(map).forEach(k=>{ const el = document.getElementById(map[k]); if(!el) return; el.addEventListener('touchstart', ()=>{}); });
-
-  bestEl.textContent = state.best;
-  lastTime = performance.now();
-  requestAnimationFrame(loop);
-})();
+  requestAnimationFrame(update);
+}
