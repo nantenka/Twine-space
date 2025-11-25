@@ -8,38 +8,38 @@
 </head>
 <body>
 
-  <!-- START SCREEN -->
-  <div id="startScreen" class="start-screen">
-    <div class="start-inner">
-      <h1 class="game-title">Twine Space</h1>
-      <div class="loading-text">Choose your skin:</div>
-      <select id="skinSelect"></select>
-      <div class="skin-preview" id="skinPreview">Preview</div>
-      <button id="playBtn" class="play-btn">PLAY</button>
-    </div>
+<!-- START SCREEN -->
+<div id="startScreen" class="start-screen">
+  <div class="start-inner">
+    <h1 class="game-title">Twine Space</h1>
+    <div class="loading-text">Loading...</div>
+    <div style="margin-top:10px">Выберите скин:</div>
+    <select id="skinSelect"></select>
+    <div class="skin-preview center" id="skinPreview">Preview</div>
+    <button id="playBtn" class="play-btn">PLAY</button>
   </div>
+</div>
 
-  <div class="wrap">
-    <main class="game-area">
-      <section class="stage">
-        <canvas id="game"></canvas>
-        <div class="hud">
-          <div class="chip">Lives: <span id="lives">3</span></div>
-        </div>
+<div class="wrap">
+  <main class="game-area">
+    <section class="stage">
+      <canvas id="game"></canvas>
+      <div class="hud">
+        <div class="chip">Lives: <span id="lives">3</span></div>
+      </div>
 
-        <!-- MOBILE BUTTONS -->
-        <div class="touch-controls" id="touchControls">
-          <button class="t-btn" id="btnLeft">◀</button>
-          <button class="t-btn" id="btnUp">▲</button>
-          <button class="t-btn" id="btnDown">▼</button>
-          <button class="t-btn" id="btnRight">▶</button>
-        </div>
-      </section>
-    </main>
-  </div>
+      <!-- MOBILE BUTTONS -->
+      <div class="touch-controls" id="touchControls">
+        <button class="t-btn" id="btnLeft">◀</button>
+        <button class="t-btn" id="btnUp">▲</button>
+        <button class="t-btn" id="btnDown">▼</button>
+        <button class="t-btn" id="btnRight">▶</button>
+      </div>
+    </section>
+    <div class="credit">by nantenka</div>
+  </main>
+</div>
 
-  <div class="credit">by nantenka</div>
-
-  <script src="game.js"></script>
+<script src="game.js"></script>
 </body>
 </html>
