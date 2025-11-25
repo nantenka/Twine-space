@@ -1,4 +1,3 @@
-/* === game.js === */
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth * 0.8;
@@ -35,7 +34,6 @@ skinSelect.addEventListener('change', ()=>{
 });
 
 shipImg.src = 'images/'+skins[0];
-skinPreview.innerHTML = '';
 let previewImg = new Image();
 previewImg.src = 'images/'+skins[0];
 previewImg.style.maxHeight='70px';
@@ -79,7 +77,9 @@ function update(){
   meteors.forEach(m=>{
     m.y += m.speed;
   });
-  meteors = meteors.filter(m=>m.y<m.canvasHeight+100);
+
+  // Remove meteors that are off-screen
+  meteors = meteors.filter(m=> m.y < canvas.height + 50);
 
   // Collision
   meteors.forEach((m,i)=>{
@@ -102,7 +102,7 @@ function draw(){
   meteors.forEach(m=>{
     ctx.fillStyle='rgba(255,100,100,0.8)';
     ctx.beginPath();
-    ctx.arc(m.x+m.w/2,m.y+m.h/2,m.w/2,0,Math.PI*2);
+    ctx.arc(m.x + m.w/2, m.y + m.h/2, m.w/2, 0, Math.PI*2);
     ctx.fill();
   });
 }
