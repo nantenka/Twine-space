@@ -33,7 +33,7 @@ skins.forEach((s,i)=>{
   opt.textContent = `Skin ${i+1}`;
   skinSelect.appendChild(opt);
 });
-ship.img.src = skins[0];
+ship.img.src = 'images/' + skins[0];
 skinPreview.style.backgroundImage = `url('images/${skins[0]}')`;
 skinPreview.style.backgroundSize = 'contain';
 skinPreview.style.backgroundRepeat = 'no-repeat';
@@ -65,7 +65,8 @@ function spawnMeteor(){
     y: -size,
     width: size,
     height: size,
-    speed: Math.random()*3 + 2
+    speed: Math.random()*3 + 2,
+    hit: false // свойство для cooldown столкновения
   });
 }
 
@@ -95,20 +96,24 @@ function update(){
   if(gameStarted && Math.random() < 0.02) spawnMeteor();
   meteors.forEach((m, i)=>{
     m.y += m.speed;
+
     ctx.fillStyle = 'red';
     ctx.beginPath();
     ctx.arc(m.x+m.width/2, m.y+m.height/2, m.width/2, 0, Math.PI*2);
     ctx.fill();
 
-    // Проверка столкновения
-    if(checkCollision(ship, m)){
-      meteors.splice(i,1);
+    // Столкновение с cooldown
+    if(!m.hit && checkCollision(ship, m)){
+      m.hit = true;
       ship.lives--;
+      if(ship.lives < 0) ship.lives = 0;
       livesDisplay.textContent = ship.lives;
     }
 
-    // Удаление за экраном
-    if(m.y > canvas.height) meteors.splice(i,1);
+    // Удаление метеорита за экраном или после столкновения
+    if(m.y > canvas.height || m.hit){
+      meteors.splice(i,1);
+    }
   });
 
   requestAnimationFrame(update);
