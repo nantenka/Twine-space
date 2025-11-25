@@ -1,13 +1,13 @@
 document.addEventListener('DOMContentLoaded', () => {
   const playBtn = document.getElementById('playBtn');
   const startScreen = document.getElementById('startScreen');
-
-  const skins = ['twine_1.png','twine_2.png','twine_3.png','twine_4.png','twine_5.png'];
   const skinSelect = document.getElementById('skinSelect');
   const skinPreview = document.getElementById('skinPreview');
-  let currentSkin = skins[0];
 
-  // заполнение выбора скинов
+  const skins = ['twine_1.png','twine_2.png','twine_3.png','twine_4.png','twine_5.png'];
+  let selectedSkin = skins[0];
+
+  // Заполняем селект
   skins.forEach(skin => {
     const option = document.createElement('option');
     option.value = skin;
@@ -15,58 +15,76 @@ document.addEventListener('DOMContentLoaded', () => {
     skinSelect.appendChild(option);
   });
 
+  function updatePreview() {
+    skinPreview.innerHTML = `<img src="images/${selectedSkin}" alt="Skin" style="height:80px;">`;
+  }
+
   skinSelect.addEventListener('change', e => {
-    currentSkin = e.target.value;
-    skinPreview.innerHTML = `<img src='images/${currentSkin}' alt='Skin' style='height:80px;'>`;
+    selectedSkin = e.target.value;
+    updatePreview();
   });
 
-  skinPreview.innerHTML = `<img src='images/${currentSkin}' alt='Skin' style='height:80px;'>`;
+  updatePreview();
 
   playBtn.addEventListener('click', () => {
     startScreen.style.display = 'none';
-    startGame(currentSkin);
+    startGame(selectedSkin);
   });
 
-  function startGame(selectedSkin) {
+  function startGame(skin) {
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
     canvas.width = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
 
-    const player = new Image();
-    player.src = `images/${selectedSkin}`;
-    let playerX = canvas.width/2;
-    let playerY = canvas.height - 120;
+    const playerImg = new Image();
+    playerImg.src = `images/${skin}`;
+    let player = {
+      x: canvas.width / 2,
+      y: canvas.height - 100,
+      width: 64,
+      height: 64,
+      lives: 3
+    };
 
-    let lives = 3;
-    document.getElementById('lives').textContent = lives;
-
-    const keys = {};
     const meteors = [];
+    const keys = {};
 
     document.addEventListener('keydown', e => keys[e.key] = true);
     document.addEventListener('keyup', e => keys[e.key] = false);
 
-    // мобильные кнопки
-    document.getElementById('btnLeft').addEventListener('click', ()=>playerX-=10);
-    document.getElementById('btnRight').addEventListener('click', ()=>playerX+=10);
-    document.getElementById('btnUp').addEventListener('click', ()=>playerY-=10);
-    document.getElementById('btnDown').addEventListener('click', ()=>playerY+=10);
+    // кнопки для мобильных
+    document.getElementById('btnLeft').addEventListener('mousedown', ()=>keys['ArrowLeft']=true);
+    document.getElementById('btnLeft').addEventListener('mouseup', ()=>keys['ArrowLeft']=false);
+    document.getElementById('btnRight').addEventListener('mousedown', ()=>keys['ArrowRight']=true);
+    document.getElementById('btnRight').addEventListener('mouseup', ()=>keys['ArrowRight']=false);
+    document.getElementById('btnUp').addEventListener('mousedown', ()=>keys['ArrowUp']=true);
+    document.getElementById('btnUp').addEventListener('mouseup', ()=>keys['ArrowUp']=false);
+    document.getElementById('btnDown').addEventListener('mousedown', ()=>keys['ArrowDown']=true);
+    document.getElementById('btnDown').addEventListener('mouseup', ()=>keys['ArrowDown']=false);
 
     function spawnMeteor() {
       meteors.push({
-        x: Math.random()*canvas.width,
+        x: Math.random() * canvas.width,
         y: -50,
         size: 20 + Math.random()*30,
         speed: 2 + Math.random()*3
       });
     }
 
-    function checkCollision(px, py, size, meteor) {
-      const dx = px - meteor.x;
-      const dy = py - meteor.y;
-      const distance = Math.sqrt(dx*dx + dy*dy);
-      return distance < size + meteor.size;
+    function rectCircleColliding(circle, rect) {
+      const distX = Math.abs(circle.x - rect.x - rect.width/2);
+      const distY = Math.abs(circle.y - rect.y - rect.height/2);
+
+      if(distX > (rect.width/2 + circle.size)) return false;
+      if(distY > (rect.height/2 + circle.size)) return false;
+
+      if(distX <= (rect.width/2)) return true;
+      if(distY <= (rect.height/2)) return true;
+
+      const dx=distX-rect.width/2;
+      const dy=distY-rect.height/2;
+      return (dx*dx + dy*dy <= circle.size*circle.size);
     }
 
     function gameLoop() {
@@ -77,16 +95,16 @@ document.addEventListener('DOMContentLoaded', () => {
       ctx.fillRect(0,0,canvas.width,canvas.height);
 
       // движение игрока
-      if(keys['ArrowLeft']) playerX -= 5;
-      if(keys['ArrowRight']) playerX +=5;
-      if(keys['ArrowUp']) playerY -=5;
-      if(keys['ArrowDown']) playerY +=5;
+      if(keys['ArrowLeft']) player.x -= 5;
+      if(keys['ArrowRight']) player.x +=5;
+      if(keys['ArrowUp']) player.y -=5;
+      if(keys['ArrowDown']) player.y +=5;
 
       // рисуем игрока
-      ctx.drawImage(player, playerX-32, playerY-32, 64,64);
+      ctx.drawImage(playerImg, player.x - player.width/2, player.y - player.height/2, player.width, player.height);
 
       // спавн метеоритов
-      if(Math.random()<0.03) spawnMeteor();
+      if(Math.random() < 0.03) spawnMeteor();
 
       // рисуем метеориты и проверяем столкновения
       ctx.fillStyle = '#ff5e5e';
@@ -97,15 +115,15 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.fill();
         m.y += m.speed;
 
-        if(checkCollision(playerX, playerY, 32, m)){
+        if(rectCircleColliding(m, player)){
           meteors.splice(i,1);
-          lives--;
-          document.getElementById('lives').textContent = lives;
-          if(lives <= 0){
+          player.lives--;
+          document.getElementById('lives').textContent = player.lives;
+          if(player.lives <= 0){
             alert('Game Over!');
             window.location.reload();
           }
-        } else if(m.y>canvas.height+50) {
+        } else if(m.y > canvas.height + 50){
           meteors.splice(i,1);
         }
       }
